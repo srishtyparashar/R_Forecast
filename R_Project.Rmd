@@ -1,0 +1,187 @@
+---
+title: "Forecast daily bike rental demand using time series models"
+author: "Srishty Parashar"
+date: "2024-08-06"
+output: html_document
+---
+
+# About Data Analysis Report
+
+This RMarkdown file contains the report of the data analysis done for the project on forecasting daily bike rental demand using time series models in R. It contains analysis such as data exploration, summary statistics and building the time series models. The final report was completed on `r date()`.
+
+**Data Description:**
+
+This dataset contains the daily count of rental bike transactions between years 2011 and 2012 in Capital bikeshare system with the corresponding weather and seasonal information.
+
+**Data Source:** <https://archive.ics.uci.edu/ml/datasets/bike+sharing+dataset>
+
+**Relevant Paper:**
+
+Fanaee-T, Hadi, and Gama, Joao, 'Event labeling combining ensemble detectors and background knowledge', Progress in Artificial Intelligence (2013): pp. 1-15, Springer Berlin Heidelberg
+
+# Task One: Load and explore the data
+
+```{r chunk 1, echo=TRUE}
+
+## Import required packages
+
+
+```
+
+
+
+## Describe and explore the data
+
+```{r chunk 2}
+## Loading and exploring the data
+library(readr)
+daily_data <- read_csv("C:/Users/srish/Downloads/day.csv")
+
+hourly_data<- read_csv("C:/Users/srish/Downloads/hour.csv")
+
+head(daily_data)
+head(hourly_data)
+str(daily_data)
+str(hourly_data)
+summary(daily_data)
+summary(hourly_data)
+
+```
+
+# Task Two: Create interactive time series plots
+
+```{r chunk3}
+
+
+# Interactive Plot for Daily Data
+library(timetk)
+library(plotly)
+daily_data %>% plot_time_series(.date_var = dteday, .value = cnt, .interactive = TRUE, .plotly_slider = TRUE, .title = "Daily Bike Rentals", .x_lab = "Date", .y_lab = "Number of Rentals")
+
+# Interactive Plot for Hourly Data
+
+hourly_data %>% plot_time_series(.date_var = dteday, .value = cnt, .interactive = TRUE, .plotly_slider = TRUE, .title = "Hourly Bike Rentals", .x_lab = "Datetime", .y_lab = "Number of Rentals")
+
+
+
+```
+
+# Task Three: Smooth time series data
+
+```{r chunk 4 }
+# calculating moving average of daily bike rentals
+library(forecast)
+smooth_d <- ma(daily_data$cnt, order=7)
+
+#creating a ggplot object
+install.packages("ggplot2")
+library(ggplot2)
+ggplot(daily_data, aes(x= dteday, y= cnt)) + geom_line(color = "blue") + geom_line(aes(y= smooth_d), color= "red") + labs(title= "Original and Smoothed Daily Bike Rentals", x= "Date", y= "Number of Rentals") + theme_classic()
+
+```
+
+# Task Four: Decompose and access the stationarity of time series data
+
+```{r chunk 5}
+# creating a time series object
+
+library(zoo)
+daily_ts <- ts(daily_data$cnt, start = c(2011, 1, 1), frequency = 365)
+daily_dates <- seq.Date(from = as.Date("2011-01-01"), by = "day", length.out = length(daily_data$cnt))
+
+
+# decomposing daily_ts into seasonal, trend, residual components
+decomp <- stl(daily_ts, s.window = "periodic")
+
+# plotting
+plot(decomp)
+
+# running the ADF Test to assess stationarity 
+library(tseries)
+adf.test(daily_ts) # results = not stationary
+
+library(lubridate)
+
+monthly_ts <- aggregate(daily_data$cnt, by = list(format(daily_dates, "%Y-%m")), FUN = sum)
+  
+# making it stationary
+## log transformation
+monthly_ts_log <- log(monthly_ts$x)
+
+adf.test(monthly_ts_log) ###not stationary enough
+
+## differencing
+monthly_ts_diff <- diff(monthly_ts$x)
+
+adf.test(monthly_ts_diff) ###not stationary enough
+
+## combining methods 
+
+monthly_ts_diff_log <- diff(log(monthly_ts$x))
+adf.test(monthly_ts_diff_log)
+
+```
+
+# Task Five: Fit and forecast time series data using ARIMA models
+
+```{r chunk 6}
+# splitting the data into training and testing sets
+
+set.seed(123)
+
+train_index <- sample(nrow(daily_data), 0.8*nrow(daily_data))
+train_data <- daily_data[train_index, ]
+test_data <- daily_data[-train_index, ]
+
+# building an ARIMA model
+library(forecast)
+arima_model <- auto.arima(train_data$cnt, ic= "bic")
+
+# evaluate the model using test data 
+
+## loading stats package
+library(stats)
+
+## defining p, d, q
+p <- 1  # AR order
+q <- 1  # differencing order
+q <- 1  # MA order
+
+
+arima_model <- arima(train_data$cnt, order = c(1, 1, 1))
+summary(arima_model)
+
+```
+
+# Task Six: Findings and Conclusions
+
+### In conclusion, using a variety of R time series analysis techniques, I investigated the daily bike rental demand data-set during this project. Based on our analysis, it appears that the data has significant seasonal and trend components, which ARIMA model was able to decompose and model.
+
+Task 1: Open and Examine the Data After the hourly and daily data were successfully loaded and examined, a clear seasonal pattern was found in the data.
+
+Task 2: Create Interactive Time Series Plots: To better understand the structure of the data, interactive plots were made to visualize the hourly and daily data.
+
+Task 3: Smooth Time Series Data: The underlying trend was highlighted in the daily data by using the moving average smoothing technique.
+
+Task 4: Decompose and assess Time Series Data Stationarity: Once the seasonal, trend, and residual components of the data were separated out, the ADF test showed that the data was not stationary. The data became stationary after differencing and log transformation were applied.
+
+Task Five: Using ARIMA Models to Fit and Forecast Time Series Data: After being developed and assessed, an ARIMA model was found to fit the data well.
+
+### During this project, I learnt of the significance of:
+
+-   Investigating and comprehending the patterns and structure of the data
+-   Using the right methods to decompose and smooth time series data
+-   Determining stationarity and putting transformations into practice to get there
+-   Constructing and assessing ARIMA time series forecasting models
+
+Given the significant seasonal and trend components in the data, the outcomes were generally what was anticipated. These patterns were well captured by the ARIMA model, and the forecasting outcomes were plausible.
+
+### My key takeaways were:
+
+-   There are significant seasonal and trend components in the daily bike rental demand dataset.
+-   With STL decomposition, the data can be effectively divided into seasonal, trend, and residual components.
+-   For the data to become stationary, transformation and differencing are needed.
+-   The demand for daily bike rentals can be accurately predicted using an ARIMA model.
+-   In time series analysis, it is crucial to investigate and comprehend the patterns and structure of the data.
+
+Overall, this project showed the value of using R's time series analysis tools and offered insightful analysis of the daily bike rental demand dataset.
